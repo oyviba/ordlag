@@ -1,0 +1,22 @@
+{
+  "name": "ordblikk",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Ordblikk – leseøving med ordbilder, setninger og lynrunde",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "icons": "pwa-assets-generator"
+  },
+  "dependencies": {
+    "@fontsource/andika": "^5.3.0",
+    "@fontsource/atkinson-hyperlegible": "^5.3.0"
+  },
+  "devDependencies": {
+    "@vite-pwa/assets-generator": "^1.0.4",
+    "vite": "^8.3.4",
+    "vite-plugin-pwa": "^1.3.0"
+  }
+}

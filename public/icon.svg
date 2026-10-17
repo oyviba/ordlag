@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#f2b31c"/>
+  <rect x="76" y="132" width="360" height="248" rx="44" fill="#ffffff"/>
+  <text x="256" y="312" text-anchor="middle" font-family="Andika, Atkinson Hyperlegible, Arial Rounded MT Bold, Verdana, sans-serif" font-weight="700" font-size="190" fill="#1b2840">ord</text>
+  <rect x="148" y="338" width="216" height="14" rx="7" fill="#d9483f"/>
+</svg>
