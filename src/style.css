@@ -70,6 +70,19 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 .reveal{margin-top:18px;border:1px dashed var(--line);background:transparent;border-radius:999px;padding:8px 18px;color:var(--muted);font-weight:700}
 .hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;color:var(--muted);font-size:.8rem;padding:0 12px;margin:0}
 
+/* Regning */
+.word.slot{color:var(--muted)}
+.word.slot.solved{color:var(--good);animation:pop .32s cubic-bezier(.3,1.5,.6,1) both}
+.answers{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;width:min(520px,100%);margin-top:clamp(16px,4vh,36px)}
+.ans{border:2px solid var(--line);background:var(--chip);border-radius:18px;padding:14px 4px;box-shadow:0 4px 0 var(--line);
+  font-family:var(--font-word);font-weight:700;font-size:calc(var(--word-scale) * clamp(1.8rem, 6vw, 2.8rem));line-height:1.1;font-variant-numeric:tabular-nums}
+.ans:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 var(--line)}
+.ans:disabled{cursor:default}
+.ans.wrong{background:var(--mark-soft);border-color:var(--mark);color:var(--mark);opacity:.6;animation:shake .35s ease}
+.ans.right{background:var(--good);border-color:var(--good);color:#fff;box-shadow:0 4px 0 color-mix(in srgb,var(--good) 60%,#000)}
+@keyframes shake{0%,100%{transform:none}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@media (max-width:440px){.answers{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 /* Lynrunde */
 .timer{position:absolute;top:0;left:0;right:0;height:8px;background:var(--track)}
 .timer i{display:block;height:100%;background:var(--good);width:100%;transition:width .1s linear}
@@ -143,4 +156,4 @@ input[type=range]{width:100%;accent-color:var(--ink)}
 #confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-@media (max-width:440px){.brand{font-size:1.05rem}.seg button{padding:7px 9px;font-size:.85rem}.goal small,.streak small{display:none}.strip{gap:10px}}
+@media (max-width:440px){.brand{display:none}.seg{margin-right:auto}.seg button{padding:7px 7px;font-size:.8rem}.goal small,.streak small{display:none}.strip{gap:10px}}
