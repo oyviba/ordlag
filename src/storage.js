@@ -3,12 +3,12 @@ export const load = (k, d) => {
   try {
     const v = localStorage.getItem(k);
     return v == null ? d : JSON.parse(v);
-  } catch (e) {
+  } catch {
     return d;
   }
 };
 export const save = (k, v) => {
   try {
     localStorage.setItem(k, JSON.stringify(v));
-  } catch (e) {}
+  } catch {}
 };

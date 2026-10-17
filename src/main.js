@@ -44,7 +44,10 @@ let task = null,
   taskTimer = null;
 let lyn = { state: "idle", score: 0, combo: 0, missed: [], end: 0, tick: null, word: "" };
 
+/** @type {(id: string) => any} */
 const $ = id => document.getElementById(id);
+/** @type {(sel: string) => NodeListOf<HTMLElement>} */
+const $$ = sel => document.querySelectorAll(sel);
 const clean = w => w.toLowerCase().replace(/[.,!?]/g, "");
 const day = (off = 0) => new Date(Date.now() - off * 864e5).toLocaleDateString("sv");
 
@@ -191,7 +194,7 @@ function renderWords(animate) {
     const b = document.createElement("button");
     b.className =
       "word" + (marked.has(clean(w)) ? " marked" : "") + (i >= revealIdx ? " ghost" : "");
-    b.style.setProperty("--i", animate ? i : 0);
+    b.style.setProperty("--i", String(animate ? i : 0));
     b.textContent = w;
     b.type = "button";
     b.setAttribute("aria-label", w + (marked.has(clean(w)) ? ", merket" : ""));
@@ -236,7 +239,8 @@ function next() {
 }
 function toggleMark(w) {
   if (lyn.state === "running") return;
-  marked.has(w) ? marked.delete(w) : marked.add(w);
+  if (marked.has(w)) marked.delete(w);
+  else marked.add(w);
   save("ob-marked", [...marked]);
   [...$("words").children].forEach(b => {
     if (clean(b.textContent) === w) b.classList.toggle("marked", marked.has(w));
@@ -454,23 +458,23 @@ function applySize() {
             : S.count >= 3
               ? 0.85
               : 1;
-  document.documentElement.style.setProperty("--word-scale", scale * crowd);
+  document.documentElement.style.setProperty("--word-scale", String(scale * crowd));
 }
 function syncUI() {
   ["ord", "setning", "lyn", "regn"].forEach(m =>
-    document.querySelector(`[data-mode="${m}"]`).setAttribute("aria-pressed", S.mode === m)
+    document.querySelector(`[data-mode="${m}"]`).setAttribute("aria-pressed", String(S.mode === m))
   );
   $("f-count").hidden = S.mode !== "ord";
   $("f-length").hidden = S.mode !== "setning";
   $("f-math").hidden = S.mode !== "regn";
-  document
-    .querySelectorAll("[data-op]")
-    .forEach(b => b.setAttribute("aria-pressed", S.ops.includes(b.dataset.op)));
+  $$("[data-op]").forEach(b =>
+    b.setAttribute("aria-pressed", String(S.ops.includes(b.dataset.op)))
+  );
   $("c-val").textContent = S.count;
   const press = (attr, val) =>
-    document
-      .querySelectorAll(`[data-${attr}]`)
-      .forEach(b => b.setAttribute("aria-pressed", b.dataset[attr] == String(val)));
+    $$(`[data-${attr}]`).forEach(b =>
+      b.setAttribute("aria-pressed", String(b.dataset[attr] == String(val)))
+    );
   press("len", S.len);
   press("flash", S.flash);
   press("list", S.list);
@@ -534,8 +538,8 @@ Object.entries(LISTS).forEach(([k, v]) => {
   };
   $("list-opts").appendChild(b);
 });
-document.querySelectorAll("[data-mode]").forEach(b => (b.onclick = () => setMode(b.dataset.mode)));
-document.querySelectorAll("[data-len]").forEach(
+$$("[data-mode]").forEach(b => (b.onclick = () => setMode(b.dataset.mode)));
+$$("[data-len]").forEach(
   b =>
     (b.onclick = () => {
       S.len = b.dataset.len;
@@ -543,14 +547,14 @@ document.querySelectorAll("[data-len]").forEach(
       newSet();
     })
 );
-document.querySelectorAll("[data-flash]").forEach(
+$$("[data-flash]").forEach(
   b =>
     (b.onclick = () => {
       S.flash = +b.dataset.flash;
       syncUI();
     })
 );
-document.querySelectorAll("[data-goal]").forEach(
+$$("[data-goal]").forEach(
   b =>
     (b.onclick = () => {
       S.goal = +b.dataset.goal;
@@ -558,7 +562,7 @@ document.querySelectorAll("[data-goal]").forEach(
       renderProgress();
     })
 );
-document.querySelectorAll("[data-dur]").forEach(
+$$("[data-dur]").forEach(
   b =>
     (b.onclick = () => {
       S.dur = +b.dataset.dur;
@@ -566,7 +570,7 @@ document.querySelectorAll("[data-dur]").forEach(
       if (S.mode === "lyn") lynIntro();
     })
 );
-document.querySelectorAll("[data-op]").forEach(
+$$("[data-op]").forEach(
   b =>
     (b.onclick = () => {
       const op = b.dataset.op;
@@ -577,7 +581,7 @@ document.querySelectorAll("[data-op]").forEach(
       if (S.mode === "regn") newTask();
     })
 );
-document.querySelectorAll("[data-max]").forEach(
+$$("[data-max]").forEach(
   b =>
     (b.onclick = () => {
       S.max = +b.dataset.max;
@@ -667,10 +671,11 @@ const closeSheets = () => {
 };
 $("open-settings").onclick = () => openSheet("sheet");
 $("open-book").onclick = () => openSheet("booksheet");
-document.querySelectorAll("[data-close]").forEach(b => (b.onclick = closeSheets));
+$$("[data-close]").forEach(b => (b.onclick = closeSheets));
 $("scrim").onclick = closeSheets;
 
 document.addEventListener("keydown", e => {
+  const t = /** @type {HTMLElement} */ (e.target);
   if (!$("reward").hidden) {
     if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
       e.preventDefault();
@@ -682,7 +687,7 @@ document.addEventListener("keydown", e => {
     if (e.key === "Escape") closeSheets();
     return;
   }
-  if (e.target.tagName === "TEXTAREA") return;
+  if (t.tagName === "TEXTAREA") return;
   const go = e.key === " " || e.key === "Enter" || e.key === "ArrowRight";
   if (S.mode === "lyn") {
     if (lyn.state === "running") {
@@ -706,13 +711,13 @@ document.addEventListener("keydown", e => {
     if (k >= 1 && k <= 4 && opt && !opt.disabled) {
       e.preventDefault();
       opt.click();
-    } else if (go && taskDone && e.target.tagName !== "BUTTON") {
+    } else if (go && taskDone && t.tagName !== "BUTTON") {
       e.preventDefault();
       newTask();
     }
     return;
   }
-  if (go && (e.target.tagName !== "BUTTON" || e.target.id === "next")) {
+  if (go && (t.tagName !== "BUTTON" || t.id === "next")) {
     e.preventDefault();
     next();
   }

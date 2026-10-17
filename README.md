@@ -10,6 +10,9 @@ npm install
 npm run dev       # utviklingsserver
 npm run build     # produksjonsbygg i dist/
 npm run preview   # test bygget lokalt (inkl. service worker)
+npm run lint      # oxlint
+npm run format    # oxfmt (CI kjører format:check)
+npm run typecheck # tsc på JS-filene
 ```
 
 `dist/` er en ren statisk side og kan legges på hvilken som helst statisk host (Netlify, Vercel, GitHub Pages, Cloudflare Pages).

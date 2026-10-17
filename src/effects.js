@@ -6,7 +6,7 @@ let actx = null,
 export function chime(freqs, enabled = true) {
   if (!enabled) return;
   try {
-    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    actx = actx || new (window.AudioContext || /** @type {any} */ (window).webkitAudioContext)();
     freqs.forEach((f, i) => {
       const o = actx.createOscillator(),
         g = actx.createGain(),
@@ -20,11 +20,11 @@ export function chime(freqs, enabled = true) {
       o.start(t);
       o.stop(t + 0.4);
     });
-  } catch (e) {}
+  } catch {}
 }
 export function confetti() {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const cv = document.getElementById("confetti"),
+  const cv = /** @type {HTMLCanvasElement} */ (document.getElementById("confetti")),
     ctx = cv.getContext("2d"),
     dpr = devicePixelRatio || 1;
   cv.width = innerWidth * dpr;
@@ -69,5 +69,5 @@ export async function requestWake() {
   try {
     wake = await navigator.wakeLock.request("screen");
     wake.addEventListener("release", () => (wake = null));
-  } catch (e) {}
+  } catch {}
 }
