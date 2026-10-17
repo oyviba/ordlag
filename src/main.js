@@ -3,17 +3,18 @@ import "@fontsource/andika/700.css";
 import "@fontsource/atkinson-hyperlegible/400.css";
 import "@fontsource/atkinson-hyperlegible/700.css";
 import "./style.css";
-import { LISTS, STICKERS, PER_STICKER, sp, sentence } from "./data.js";
+import { LISTS, STICKERS, PER_STICKER, sp, sentence, OPS, mathTask } from "./data.js";
 import { load, save } from "./storage.js";
 import { chime, confetti, requestWake } from "./effects.js";
 
-let S = Object.assign({mode:"ord",count:1,list:"n1",flash:0,size:3,build:false,len:"kort",goal:30,dur:60,sound:true}, load("ob-settings",{}));
+let S = Object.assign({mode:"ord",count:1,list:"n1",flash:0,size:3,build:false,len:"kort",goal:30,dur:60,sound:true,ops:["+","-"],max:10}, load("ob-settings",{}));
 let marked = new Set(load("ob-marked",[]));
 LISTS.egen.words = load("ob-custom","");
 const freshStats = () => ({total:0, stickers:{}, today:{date:"",n:0}, streak:{last:"",n:0}, best:{}});
 let stats = Object.assign(freshStats(), load("ob-stats",{}));
 let current=[], revealIdx=0, lastShown=new Set(), flashTimer=null;
 let rewards=[];
+let task=null, taskDone=false, taskTimer=null;
 let lyn = {state:"idle", score:0, combo:0, missed:[], end:0, tick:null, word:""};
 
 const $ = id => document.getElementById(id);
@@ -110,18 +111,19 @@ function flushRewards(){
   confetti();
   setTimeout(()=>$("rw-ok").focus(),50);
 }
-$("rw-ok").onclick=()=>{ $("reward").hidden=true; $("scrim").hidden=true; flushRewards(); };
+$("rw-ok").onclick=()=>{ $("reward").hidden=true; $("scrim").hidden=true; flushRewards(); if(S.mode==="regn" && taskDone && $("reward").hidden) newTask(); };
 
 /* ---------- Normal modes ---------- */
 function newSet(){
   clearTimeout(flashTimer);
+  if (S.mode==="regn") return newTask();
   if (S.mode==="ord"){ current = pickWords(S.count); revealIdx = current.length; }
   else { current = sentence(S.len); revealIdx = S.build ? 1 : current.length; }
   renderWords(true);
 }
 function renderWords(animate){
   const box=$("words");
-  box.hidden=false; $("panel").hidden=true;
+  box.hidden=false; $("panel").hidden=true; $("answers").hidden=true;
   box.classList.remove("hidden","pop");
   box.innerHTML="";
   current.forEach((w,i)=>{
@@ -161,6 +163,45 @@ function toggleMark(w){
   save("ob-marked",[...marked]);
   [...$("words").children].forEach(b=>{ if(clean(b.textContent)===w) b.classList.toggle("marked", marked.has(w)); });
   renderMarked();
+}
+
+/* ---------- Regning ---------- */
+function newTask(){
+  clearTimeout(taskTimer);
+  let t, tries=0;
+  do { t = mathTask(S.ops, S.max); } while (task && t.a===task.a && t.b===task.b && t.op===task.op && ++tries<10);
+  task=t; taskDone=false;
+  const box=$("words");
+  box.hidden=false; $("panel").hidden=true; $("reveal").hidden=true;
+  box.classList.remove("hidden","pop");
+  box.innerHTML = [task.a, OPS[task.op], task.b, "=", "?"].map((x,i)=>`<span class="word${i===4?" slot":""}" style="--i:${i}">${x}</span>`).join("");
+  box.setAttribute("aria-label", `${task.a} ${OPS[task.op]} ${task.b} er lik hva?`);
+  void box.offsetWidth; box.classList.add("pop");
+  const ans=$("answers"); ans.hidden=false; ans.innerHTML="";
+  task.opts.forEach(v=>{
+    const b=document.createElement("button"); b.type="button"; b.className="ans"; b.textContent=v;
+    b.onclick=()=>answerTask(v,b);
+    ans.appendChild(b);
+  });
+  $("hint").textContent="Trykk på riktig svar";
+  renderBottom();
+}
+function answerTask(v,btn){
+  if (taskDone) return;
+  requestWake();
+  if (v!==task.ans){
+    btn.classList.remove("wrong"); void btn.offsetWidth; btn.classList.add("wrong"); btn.disabled=true;
+    return;
+  }
+  taskDone=true;
+  btn.classList.add("right");
+  const slot=$("words").querySelector(".slot"); slot.textContent=task.ans; slot.classList.add("solved");
+  [...$("answers").children].forEach(b=>b.disabled=true);
+  $("hint").textContent="Riktig!";
+  chime([660,990], S.sound);
+  addWords(1);
+  renderBottom();
+  taskTimer=setTimeout(()=>{ if(S.mode==="regn" && $("reward").hidden) newTask(); }, 1100);
 }
 
 /* ---------- Lynrunde ---------- */
@@ -239,7 +280,10 @@ function lynFinish(){
 /* ---------- Bottom bar ---------- */
 function renderBottom(){
   const b=$("bottom");
-  if (S.mode!=="lyn"){
+  if (S.mode==="regn"){
+    b.innerHTML=`<button class="${taskDone?"next":"btn2"}" id="next">${taskDone?"Neste":"Hopp over"}</button>`;
+    $("next").onclick=newTask;
+  } else if (S.mode!=="lyn"){
     const complete = revealIdx>=current.length;
     b.innerHTML=`<button class="next" id="next">${complete?"Neste":"Neste ord"}</button>`;
     $("next").onclick=next;
@@ -257,16 +301,18 @@ function renderBottom(){
 /* ---------- Settings ---------- */
 function applySize(){
   const scale=[.7,.85,1,1.2,1.45][S.size-1];
-  const crowd = S.mode==="setning" ? .78 : S.mode==="lyn" ? 1.15 : (S.count>=5?.72:S.count>=3?.85:1);
+  const crowd = S.mode==="setning" ? .78 : S.mode==="lyn" ? 1.15 : S.mode==="regn" ? 1 : (S.count>=5?.72:S.count>=3?.85:1);
   document.documentElement.style.setProperty("--word-scale", scale*crowd);
 }
 function syncUI(){
-  ["ord","setning","lyn"].forEach(m=>document.querySelector(`[data-mode="${m}"]`).setAttribute("aria-pressed", S.mode===m));
+  ["ord","setning","lyn","regn"].forEach(m=>document.querySelector(`[data-mode="${m}"]`).setAttribute("aria-pressed", S.mode===m));
   $("f-count").hidden = S.mode!=="ord";
   $("f-length").hidden = S.mode!=="setning";
+  $("f-math").hidden = S.mode!=="regn";
+  document.querySelectorAll("[data-op]").forEach(b=>b.setAttribute("aria-pressed", S.ops.includes(b.dataset.op)));
   $("c-val").textContent=S.count;
   const press=(attr,val)=>document.querySelectorAll(`[data-${attr}]`).forEach(b=>b.setAttribute("aria-pressed",b.dataset[attr]==String(val)));
-  press("len",S.len); press("flash",S.flash); press("list",S.list); press("goal",S.goal); press("dur",S.dur);
+  press("len",S.len); press("flash",S.flash); press("list",S.list); press("goal",S.goal); press("dur",S.dur); press("max",S.max);
   $("custom-wrap").hidden = S.list!=="egen";
   $("build").checked=S.build; $("sound").checked=S.sound;
   $("size").value=S.size;
@@ -291,9 +337,11 @@ function renderBook(){
 }
 function setMode(m){
   if (lyn.tick) clearInterval(lyn.tick);
+  clearTimeout(taskTimer);
   lyn.state="idle";
   S.mode=m; syncUI();
-  $("timer").hidden=true; $("score").hidden=true;
+  $("timer").hidden=true; $("score").hidden=true; $("answers").hidden=true;
+  $("words").removeAttribute("aria-label");
   if (m==="lyn") lynIntro(); else newSet();
 }
 
@@ -307,6 +355,13 @@ document.querySelectorAll("[data-len]").forEach(b=>b.onclick=()=>{S.len=b.datase
 document.querySelectorAll("[data-flash]").forEach(b=>b.onclick=()=>{S.flash=+b.dataset.flash; syncUI();});
 document.querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>{S.goal=+b.dataset.goal; syncUI(); renderProgress();});
 document.querySelectorAll("[data-dur]").forEach(b=>b.onclick=()=>{S.dur=+b.dataset.dur; syncUI(); if(S.mode==="lyn") lynIntro();});
+document.querySelectorAll("[data-op]").forEach(b=>b.onclick=()=>{
+  const op=b.dataset.op;
+  if (S.ops.includes(op)){ if (S.ops.length>1) S.ops=S.ops.filter(o=>o!==op); }
+  else S.ops=[...S.ops, op];
+  syncUI(); if(S.mode==="regn") newTask();
+});
+document.querySelectorAll("[data-max]").forEach(b=>b.onclick=()=>{S.max=+b.dataset.max; syncUI(); if(S.mode==="regn") newTask();});
 $("c-minus").onclick=()=>{S.count=Math.max(1,S.count-1); syncUI(); newSet();};
 $("c-plus").onclick=()=>{S.count=Math.min(6,S.count+1); syncUI(); newSet();};
 $("build").onchange=e=>{S.build=e.target.checked; syncUI(); newSet();};
@@ -340,6 +395,12 @@ document.addEventListener("keydown",e=>{
   if (S.mode==="lyn"){
     if (lyn.state==="running"){ if(go){e.preventDefault();lynAnswer(true);} if(e.key==="ArrowLeft"){e.preventDefault();lynAnswer(false);} }
     else if (go && lyn.state!=="countdown"){ e.preventDefault(); lynStart(); }
+    return;
+  }
+  if (S.mode==="regn"){
+    const k=+e.key, opt=$("answers").children[k-1];
+    if (k>=1 && k<=4 && opt && !opt.disabled){ e.preventDefault(); opt.click(); }
+    else if (go && taskDone && e.target.tagName!=="BUTTON"){ e.preventDefault(); newTask(); }
     return;
   }
   if(go && (e.target.tagName!=="BUTTON"||e.target.id==="next")){e.preventDefault(); next();}

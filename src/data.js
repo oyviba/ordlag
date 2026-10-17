@@ -50,3 +50,19 @@ export function sentence(len){
   w[w.length-1] += q ? "?" : ".";
   return w;
 }
+
+/* Arithmetic tasks. Answers are always whole numbers from 0 and up; × and : use the 1–10 tables, capped by max. */
+export const OPS = {"+":"+", "-":"−", "*":"·", "/":":"};
+const ri = (lo,hi) => lo + Math.floor(Math.random()*(hi-lo+1));
+export function mathTask(ops, max){
+  const op = r(ops.length ? ops : ["+"]);
+  let a, b, ans;
+  if (op==="+"){ ans = ri(0,max); a = ri(0,ans); b = ans-a; }
+  else if (op==="-"){ a = ri(0,max); b = ri(0,a); ans = a-b; }
+  else if (op==="*"){ do { a = ri(1,10); b = ri(1,10); } while (a*b > max); ans = a*b; }
+  else { do { b = ri(1,10); ans = ri(0,10); } while (b*ans > max); a = b*ans; }
+  const opts = new Set([ans]);
+  const spread = max>20 ? [1,2,10,-1,-2,-10,3,-3] : [1,2,-1,-2,3,-3,4];
+  while (opts.size < 4){ const v = ans + r(spread); if (v>=0) opts.add(v); }
+  return {a, b, op, ans, opts:[...opts].sort(()=>Math.random()-.5)};
+}

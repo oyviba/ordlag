@@ -1,6 +1,6 @@
 # Ordblikk
 
-Leseøving for barn: ordbilder, korte setninger og lynrunde, med klistremerker som belønning.
+Leseøving og regning for barn: ordbilder, korte setninger, lynrunde og regnestykker (+ − · :), med klistremerker som belønning.
 Installerbar web-app (PWA) som fungerer uten nett etter første besøk. All fremgang lagres lokalt på enheten.
 
 ## Kom i gang
@@ -19,7 +19,7 @@ På iPad/iPhone: åpne siden i Safari → Del → «Legg til på Hjem-skjerm».
 
 - `index.html` – markup
 - `src/main.js` – app-logikk (moduser, fremgang, innstillinger)
-- `src/data.js` – ordlister, klistremerker og setningsgenerator
+- `src/data.js` – ordlister, klistremerker, setningsgenerator og regneoppgaver
 - `src/effects.js` – lyd, konfetti, skjermlås
 - `src/storage.js` – localStorage-hjelpere
 - `src/style.css` – stiler
