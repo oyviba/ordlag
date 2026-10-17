@@ -18,6 +18,7 @@ let S = Object.assign(
     len: "kort",
     goal: 30,
     dur: 60,
+    lynKind: "ord",
     sound: true,
     ops: ["+", "-"],
     max: 10,
@@ -154,7 +155,7 @@ function flushRewards() {
     $("rw-eyebrow").textContent = "Lynrunde";
     $("rw-e").textContent = "🏆";
     $("rw-n").textContent = "Ny rekord!";
-    $("rw-p").textContent = rw.score + " ord på " + S.dur + " sekunder.";
+    $("rw-p").textContent = rw.score + " " + rw.unit + " på " + S.dur + " sekunder.";
     $("rw-ok").textContent = "Jippi!";
     chime([784, 988, 1175, 1568], S.sound);
   }
@@ -189,6 +190,7 @@ function renderWords(animate) {
   $("panel").hidden = true;
   $("answers").hidden = true;
   box.classList.remove("hidden", "pop");
+  box.removeAttribute("aria-label");
   box.innerHTML = "";
   current.forEach((w, i) => {
     const b = document.createElement("button");
@@ -280,12 +282,19 @@ function newTask() {
     b.onclick = () => answerTask(v, b);
     ans.appendChild(b);
   });
-  $("hint").textContent = "Trykk på riktig svar";
+  $("hint").textContent = S.mode === "lyn" ? "" : "Trykk på riktig svar";
   renderBottom();
+}
+const taskLabel = () => `${task.a} ${OPS[task.op]} ${task.b} = ${task.ans}`;
+function solveSlot() {
+  const slot = $("words").querySelector(".slot");
+  slot.textContent = task.ans;
+  slot.classList.add("solved");
 }
 function answerTask(v, btn) {
   if (taskDone) return;
   requestWake();
+  if (S.mode === "lyn") return lynMathAnswer(v, btn);
   if (v !== task.ans) {
     btn.classList.remove("wrong");
     void btn.offsetWidth;
@@ -295,9 +304,7 @@ function answerTask(v, btn) {
   }
   taskDone = true;
   btn.classList.add("right");
-  const slot = $("words").querySelector(".slot");
-  slot.textContent = task.ans;
-  slot.classList.add("solved");
+  solveSlot();
   [...$("answers").children].forEach(b => (b.disabled = true));
   $("hint").textContent = "Riktig!";
   chime([660, 990], S.sound);
@@ -313,17 +320,38 @@ function lynIntro() {
   clearInterval(lyn.tick);
   lyn.state = "idle";
   $("words").hidden = true;
+  $("answers").hidden = true;
   $("timer").hidden = true;
   $("score").hidden = true;
   $("reveal").hidden = true;
   $("hint").textContent = "";
-  const best = stats.best[S.dur] || 0;
+  const best = stats.best[lynKey()] || 0;
+  const regn = S.lynKind === "regn";
   $("panel").hidden = false;
   $("panel").innerHTML = `<div class="intro"><h2>Lynrunde</h2>
-    <p>Les så mange ord du klarer på ${S.dur} sekunder. Den voksne trykker «Kunne» når ordet sitter.</p>
-    ${best ? `<p>Rekorden din: <b>${best} ord</b></p>` : `<p>Sett din første rekord!</p>`}</div>`;
+    <div class="row kinds" role="group" aria-label="Hva skal vi øve på?">
+      <button class="opt" data-kind="ord" aria-pressed="${!regn}">Ord</button>
+      <button class="opt" data-kind="regn" aria-pressed="${regn}">Regning</button>
+    </div>
+    <p>${
+      regn
+        ? `Løs så mange regnestykker du klarer på ${S.dur} sekunder. Trykk på riktig svar.`
+        : `Les så mange ord du klarer på ${S.dur} sekunder. Den voksne trykker «Kunne» når ordet sitter.`
+    }</p>
+    ${best ? `<p>Rekorden din: <b>${best} ${lynUnit()}</b></p>` : `<p>Sett din første rekord!</p>`}</div>`;
+  $$("[data-kind]").forEach(
+    b =>
+      (b.onclick = () => {
+        S.lynKind = b.dataset.kind;
+        syncUI();
+        lynIntro();
+      })
+  );
   renderBottom();
 }
+/* Words and math keep separate records; word records keep their old keys. */
+const lynKey = () => (S.lynKind === "regn" ? "regn" + S.dur : String(S.dur));
+const lynUnit = () => (S.lynKind === "regn" ? "regnestykker" : "ord");
 function lynStart() {
   requestWake();
   lyn = { state: "countdown", score: 0, combo: 0, missed: [], end: 0, tick: null, word: "" };
@@ -352,7 +380,8 @@ function lynGo() {
   $("panel").hidden = true;
   $("timer").hidden = false;
   $("score").hidden = false;
-  lynWord();
+  if (S.lynKind === "regn") newTask();
+  else lynWord();
   renderBottom();
   updateScore();
   lyn.tick = setInterval(() => {
@@ -369,7 +398,7 @@ function lynWord() {
   renderWords(true);
   $("hint").textContent = "";
 }
-function lynAnswer(ok) {
+function lynAnswer(ok, item = lyn.word) {
   if (lyn.state !== "running") return;
   if (ok) {
     lyn.score++;
@@ -384,36 +413,65 @@ function lynAnswer(ok) {
     }
   } else {
     lyn.combo = 0;
-    if (!lyn.missed.includes(lyn.word)) lyn.missed.push(lyn.word);
-    marked.add(lyn.word);
-    save("ob-marked", [...marked]);
+    if (!lyn.missed.includes(item)) lyn.missed.push(item);
+    if (S.lynKind === "ord") {
+      marked.add(item);
+      save("ob-marked", [...marked]);
+    }
+  }
+  if (S.lynKind === "regn") {
+    if (ok) addWords(1);
+    updateScore();
+    return;
   }
   addWords(1);
   updateScore();
   lynWord();
 }
+function lynMathAnswer(v, btn) {
+  if (lyn.state !== "running") return;
+  const ok = v === task.ans;
+  taskDone = true;
+  [...$("answers").children].forEach(b => {
+    b.disabled = true;
+    if (+b.textContent === task.ans) b.classList.add("right");
+  });
+  if (!ok) btn.classList.add("wrong");
+  solveSlot();
+  if (ok) chime([660, 990], S.sound);
+  lynAnswer(ok, taskLabel());
+  // A wrong answer stays up a little longer so the right one can be seen.
+  taskTimer = setTimeout(() => lyn.state === "running" && newTask(), ok ? 300 : 1000);
+}
+function lynSkip() {
+  if (lyn.state !== "running" || taskDone) return;
+  lynAnswer(false, taskLabel());
+  newTask();
+}
 function updateScore() {
-  $("score").innerHTML = `${lyn.score}<small>kunne</small>`;
+  $("score").innerHTML = `${lyn.score}<small>${S.lynKind === "regn" ? "riktige" : "kunne"}</small>`;
 }
 function lynFinish() {
   clearInterval(lyn.tick);
+  clearTimeout(taskTimer);
   lyn.state = "done";
   $("timer").hidden = true;
   $("score").hidden = true;
   $("words").hidden = true;
+  $("answers").hidden = true;
   $("hint").textContent = "";
-  const best = stats.best[S.dur] || 0;
+  const best = stats.best[lynKey()] || 0;
   const isRecord = lyn.score > 0 && lyn.score > best;
   if (isRecord) {
-    stats.best[S.dur] = lyn.score;
+    stats.best[lynKey()] = lyn.score;
     save("ob-stats", stats);
-    rewards.unshift({ type: "record", score: lyn.score });
+    rewards.unshift({ type: "record", score: lyn.score, unit: lynUnit() });
   }
   $("panel").hidden = false;
   $("panel").innerHTML = `<div class="intro">
     <span class="label">Du klarte</span>
     <div class="big">${lyn.score}</div>
-    <p>ord på ${S.dur} sekunder</p>
+    <p>${S.lynKind === "regn" ? "riktige regnestykker" : "ord"} på ${S.dur} sekunder</p>
     ${isRecord ? '<span class="record">Ny rekord!</span>' : best ? `<p>Rekord: ${best}</p>` : ""}
     ${lyn.missed.length ? `<p>Øv mer på:</p><div class="missed">${lyn.missed.map(w => `<span>${w}</span>`).join("")}</div>` : ""}
   </div>`;
@@ -431,6 +489,9 @@ function renderBottom() {
     const complete = revealIdx >= current.length;
     b.innerHTML = `<button class="next" id="next">${complete ? "Neste" : "Neste ord"}</button>`;
     $("next").onclick = next;
+  } else if (lyn.state === "running" && S.lynKind === "regn") {
+    b.innerHTML = `<button class="btn2" id="skip">Hopp over</button>`;
+    $("skip").onclick = lynSkip;
   } else if (lyn.state === "running") {
     b.innerHTML = `<button class="btn2" id="miss">Øv mer</button><button class="next btn-good" id="hit">Kunne!</button>`;
     $("miss").onclick = () => lynAnswer(false);
@@ -450,7 +511,9 @@ function applySize() {
     S.mode === "setning"
       ? 0.78
       : S.mode === "lyn"
-        ? 1.15
+        ? S.lynKind === "regn"
+          ? 1
+          : 1.15
         : S.mode === "regn"
           ? 1
           : S.count >= 5
@@ -466,7 +529,7 @@ function syncUI() {
   );
   $("f-count").hidden = S.mode !== "ord";
   $("f-length").hidden = S.mode !== "setning";
-  $("f-math").hidden = S.mode !== "regn";
+  $("f-math").hidden = !(S.mode === "regn" || (S.mode === "lyn" && S.lynKind === "regn"));
   $$("[data-op]").forEach(b =>
     b.setAttribute("aria-pressed", String(S.ops.includes(b.dataset.op)))
   );
@@ -690,7 +753,13 @@ document.addEventListener("keydown", e => {
   if (t.tagName === "TEXTAREA") return;
   const go = e.key === " " || e.key === "Enter" || e.key === "ArrowRight";
   if (S.mode === "lyn") {
-    if (lyn.state === "running") {
+    if (lyn.state === "running" && S.lynKind === "regn") {
+      const opt = $("answers").children[+e.key - 1];
+      if (+e.key >= 1 && opt && !opt.disabled) {
+        e.preventDefault();
+        opt.click();
+      }
+    } else if (lyn.state === "running") {
       if (go) {
         e.preventDefault();
         lynAnswer(true);
