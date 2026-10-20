@@ -5,6 +5,7 @@ import "@fontsource/atkinson-hyperlegible/700.css";
 import "./style.css";
 import { LISTS, STICKERS, PER_STICKER, sp, sentence, OPS, mathTask, lookalikes } from "./data.js";
 import { load, save } from "./storage.js";
+import { canHear, matches, startHearing, finishHearing, stopHearing } from "./hear.js";
 import { chime, confetti, requestWake, canSpeak, missingVoice, speak } from "./effects.js";
 
 let S = Object.assign(
@@ -15,6 +16,7 @@ let S = Object.assign(
     flash: 0,
     size: 3,
     build: false,
+    hear: false,
     len: "kort",
     goal: 30,
     dur: 60,
@@ -43,6 +45,9 @@ let task = null,
   taskDone = false,
   taskTimer = null;
 let listen = null;
+let heard = new Set(),
+  hearing = false,
+  hearDone = false;
 let lyn = { state: "idle", score: 0, combo: 0, missed: [], end: 0, tick: null, word: "" };
 
 /** @type {(id: string) => any} */
@@ -170,11 +175,16 @@ $("rw-ok").onclick = () => {
   flushRewards();
   if (S.mode === "regn" && taskDone && $("reward").hidden) newTask();
   if (S.mode === "lytt" && listen?.done && $("reward").hidden) newListen();
+  if (hearOn() && hearDone && $("reward").hidden) newSet();
 };
 
 /* ---------- Normal modes ---------- */
 function newSet() {
   clearTimeout(flashTimer);
+  stopHearing();
+  hearing = false;
+  hearDone = false;
+  heard = new Set();
   if (S.mode === "regn") return newTask();
   if (S.mode === "lytt") return newListen();
   if (S.mode === "ord") {
@@ -182,7 +192,7 @@ function newSet() {
     revealIdx = current.length;
   } else {
     current = sentence(S.len);
-    revealIdx = S.build ? 1 : current.length;
+    revealIdx = S.build && !hearOn() ? 1 : current.length;
   }
   renderWords(true);
 }
@@ -196,7 +206,10 @@ function renderWords(animate) {
   current.forEach((w, i) => {
     const b = document.createElement("button");
     b.className =
-      "word" + (marked.has(clean(w)) ? " marked" : "") + (i >= revealIdx ? " ghost" : "");
+      "word" +
+      (marked.has(clean(w)) ? " marked" : "") +
+      (i >= revealIdx ? " ghost" : "") +
+      (heard.has(i) ? " heard" : "");
     b.style.setProperty("--i", String(animate ? i : 0));
     b.textContent = w;
     b.type = "button";
@@ -210,8 +223,9 @@ function renderWords(animate) {
   }
   $("reveal").hidden = true;
   const complete = revealIdx >= current.length;
-  $("hint").textContent =
-    S.mode === "ord"
+  $("hint").textContent = hearOn()
+    ? "Trykk på mikrofonen og les høyt"
+    : S.mode === "ord"
       ? "Trykk på et ord som var vanskelig"
       : S.build && !complete
         ? "Les ordet, så trykk «Neste ord»"
@@ -240,6 +254,63 @@ function next() {
   addWords(current.length);
   newSet();
 }
+/* ---------- Appen lytter ---------- */
+const hearOn = () => S.hear && canHear && (S.mode === "ord" || S.mode === "setning");
+function toggleHearing() {
+  requestWake();
+  if (hearDone) return;
+  if (hearing) return finishHearing();
+  hearing = true;
+  $("hint").textContent = "Les høyt nå …";
+  renderBottom();
+  startHearing({
+    onWords: tokens => {
+      current.forEach((w, i) => {
+        if (heard.has(i) || !tokens.some(t => matches(clean(w), t))) return;
+        heard.add(i);
+        $("words").children[i]?.classList.add("heard");
+      });
+      if (heard.size === current.length) heardAll();
+    },
+    onEnd: () => {
+      hearing = false;
+      if (!hearDone && $("hint").textContent === "Les høyt nå …")
+        $("hint").textContent = heard.size
+          ? "Nesten! Trykk og les resten en gang til"
+          : "Hørte ikke ordet. Trykk og prøv igjen";
+      renderBottom();
+    },
+    onError: err => {
+      $("hint").textContent =
+        err === "not-allowed" || err === "service-not-allowed"
+          ? "Gi appen lov til å bruke mikrofonen"
+          : err === "network"
+            ? "Talegjenkjenning trenger nett"
+            : err === "language-not-supported"
+              ? "Nettleseren forstår ikke norsk tale"
+              : "Hørte ikke ordet. Trykk og prøv igjen";
+    },
+  });
+}
+function heardAll() {
+  hearDone = true;
+  stopHearing();
+  hearing = false;
+  chime([660, 990], S.sound);
+  $("hint").textContent = "Bra lest!";
+  renderBottom();
+  addWords(current.length);
+  const set = current;
+  flashTimer = setTimeout(() => {
+    if (current === set && $("reward").hidden) newSet();
+  }, 1200);
+}
+/** Skipping in listening mode only counts the words that were actually heard. */
+function skipHeard() {
+  if (heard.size && !hearDone) addWords(heard.size);
+  newSet();
+}
+
 function toggleMark(w) {
   if (lyn.state === "running") return;
   if (marked.has(w)) marked.delete(w);
@@ -503,6 +574,12 @@ function renderBottom() {
     const done = S.mode === "regn" ? taskDone : !!listen?.done;
     b.innerHTML = `<button class="${done ? "next" : "btn2"}" id="next">${done ? "Neste" : "Hopp over"}</button>`;
     $("next").onclick = S.mode === "regn" ? newTask : newListen;
+  } else if (hearOn()) {
+    b.innerHTML = hearDone
+      ? `<button class="next" id="next">Neste</button>`
+      : `<button class="btn2" id="next">Hopp over</button><button class="next mic${hearing ? " on" : ""}" id="mic">${hearing ? "Ferdig" : "Les høyt"}</button>`;
+    $("next").onclick = skipHeard;
+    if ($("mic")) $("mic").onclick = toggleHearing;
   } else if (S.mode !== "lyn") {
     const complete = revealIdx >= current.length;
     b.innerHTML = `<button class="next" id="next">${complete ? "Neste" : "Neste ord"}</button>`;
@@ -542,6 +619,7 @@ function syncUI() {
   );
   $("f-count").hidden = S.mode !== "ord";
   $("f-length").hidden = S.mode !== "setning";
+  $("f-hear").hidden = S.mode !== "ord" && S.mode !== "setning";
   $("f-math").hidden = S.mode !== "regn";
   $$("[data-op]").forEach(b =>
     b.setAttribute("aria-pressed", String(S.ops.includes(b.dataset.op)))
@@ -559,6 +637,7 @@ function syncUI() {
   press("max", S.max);
   $("custom-wrap").hidden = S.list !== "egen";
   $("build").checked = S.build;
+  $("hear").checked = S.hear;
   $("sound").checked = S.sound;
   $("size").value = S.size;
   applySize();
@@ -590,6 +669,8 @@ function renderBook() {
 function setMode(m) {
   if (lyn.tick) clearInterval(lyn.tick);
   clearTimeout(taskTimer);
+  stopHearing();
+  hearing = false;
   lyn.state = "idle";
   S.mode = m;
   syncUI();
@@ -677,6 +758,14 @@ $("c-plus").onclick = () => {
 };
 $("build").onchange = e => {
   S.build = e.target.checked;
+  syncUI();
+  newSet();
+};
+$("hear").disabled = !canHear;
+if (!canHear)
+  $("hear-note").textContent = "Denne nettleseren kan ikke lytte. Prøv Chrome eller Safari.";
+$("hear").onchange = e => {
+  S.hear = e.target.checked;
   syncUI();
   newSet();
 };
@@ -804,6 +893,12 @@ document.addEventListener("keydown", e => {
       if (listen.done) newListen();
       else say();
     }
+    return;
+  }
+  if (hearOn() && go && t.tagName !== "BUTTON") {
+    e.preventDefault();
+    if (hearDone) newSet();
+    else toggleHearing();
     return;
   }
   if (go && (t.tagName !== "BUTTON" || t.id === "next")) {

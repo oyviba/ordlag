@@ -195,7 +195,7 @@ export function mathTask(ops, max) {
 }
 
 /* Look-alike distractors for Lytt: closest words by edit distance, nudged towards same first letter and length. */
-function lev(a, b) {
+export function lev(a, b) {
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
     const cur = [i];
