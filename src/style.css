@@ -400,6 +400,22 @@ textarea:focus-visible {
   }
 }
 
+/* Appen lytter */
+.word.heard {
+  color: var(--good);
+  box-shadow: inset 0 -0.08em 0 var(--good);
+}
+.mic.on {
+  outline: 4px solid transparent;
+  outline-offset: 3px;
+  animation: listening 1.2s ease-in-out infinite;
+}
+@keyframes listening {
+  50% {
+    outline-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}
+
 /* Lytt */
 .say {
   width: 1.6em;
