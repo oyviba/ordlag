@@ -11,6 +11,7 @@ import { chime, confetti, requestWake, canSpeak, missingVoice, speak } from "./e
 let S = Object.assign(
   {
     mode: "ord",
+    readMode: "ord",
     count: 1,
     list: "n1",
     flash: 0,
@@ -19,6 +20,7 @@ let S = Object.assign(
     hear: false,
     len: "kort",
     goal: 30,
+    mathGoal: 20,
     dur: 60,
     sound: true,
     ops: ["+", "-"],
@@ -26,12 +28,15 @@ let S = Object.assign(
   },
   load("ob-settings", {})
 );
+if (S.mode !== "regn") S.readMode = S.mode;
 let marked = new Set(load("ob-marked", []));
 LISTS.egen.words = load("ob-custom", "");
+// The top-level total/today are reading; math keeps its own count. Both feed the shared stickers and streak.
 const freshStats = () => ({
   total: 0,
   stickers: {},
   today: { date: "", n: 0 },
+  math: { total: 0, today: { date: "", n: 0 } },
   streak: { last: "", n: 0 },
   best: {},
 });
@@ -55,6 +60,10 @@ const $ = id => document.getElementById(id);
 /** @type {(sel: string) => NodeListOf<HTMLElement>} */
 const $$ = sel => document.querySelectorAll(sel);
 const clean = w => w.toLowerCase().replace(/[.,!?]/g, "");
+const isMath = () => S.mode === "regn";
+const side = () => (isMath() ? stats.math : stats);
+const goal = () => (isMath() ? S.mathGoal : S.goal);
+const stickerPoints = () => stats.total + stats.math.total;
 const day = (off = 0) => new Date(Date.now() - off * 864e5).toLocaleDateString("sv");
 
 /* ---------- Words ---------- */
@@ -88,20 +97,23 @@ function pickWords(n) {
 }
 
 /* ---------- Progress & rewards ---------- */
-function addWords(n) {
+/** Count n words read (or math tasks solved, in Regning). */
+function addProgress(n) {
   const d = day();
-  if (stats.today.date !== d) stats.today = { date: d, n: 0 };
-  if (stats.today.n === 0 && stats.streak.last !== d) {
+  const sd = side();
+  if (sd.today.date !== d) sd.today = { date: d, n: 0 };
+  if (stats.streak.last !== d) {
     stats.streak.n = stats.streak.last === day(1) ? stats.streak.n + 1 : 1;
     stats.streak.last = d;
   }
-  const goalBefore = stats.today.n >= S.goal;
-  const before = stats.total;
-  stats.today.n += n;
-  stats.total += n;
-  const earned = Math.floor(stats.total / PER_STICKER) - Math.floor(before / PER_STICKER);
+  const goalBefore = sd.today.n >= goal();
+  const before = stickerPoints();
+  sd.today.n += n;
+  sd.total += n;
+  const earned = Math.floor(stickerPoints() / PER_STICKER) - Math.floor(before / PER_STICKER);
   for (let i = 0; i < earned; i++) rewards.push({ type: "sticker", idx: awardSticker() });
-  if (!goalBefore && stats.today.n >= S.goal) rewards.push({ type: "goal" });
+  if (!goalBefore && sd.today.n >= goal())
+    rewards.push({ type: "goal", text: goal() + (isMath() ? " oppgaver" : " ord") + " i dag. " });
   save("ob-stats", stats);
   renderProgress();
   if (lyn.state !== "running") flushRewards();
@@ -113,22 +125,24 @@ function awardSticker() {
   return idx;
 }
 function renderProgress() {
-  const n = stats.today.date === day() ? stats.today.n : 0;
-  const frac = Math.min(1, n / S.goal);
+  const sd = side();
+  const n = sd.today.date === day() ? sd.today.n : 0;
+  const frac = Math.min(1, n / goal());
   $("ring").style.strokeDashoffset = 119.4 * (1 - frac);
   $("ring").style.stroke = frac >= 1 ? "var(--accent)" : "";
   $("ring-n").textContent = n;
-  $("goal-txt").textContent = n + " / " + S.goal;
+  $("goal-txt").textContent = n + " / " + goal();
+  $("goal-unit").textContent = isMath() ? "oppgaver i dag" : "ord i dag";
   const live = stats.streak.last === day() || stats.streak.last === day(1);
   const sn = live ? stats.streak.n : 0;
   $("streak-n").textContent = sn;
   $("streak").classList.toggle("off", stats.streak.last !== day());
   $("streak").setAttribute("aria-label", sn + " dager på rad");
-  const into = stats.total % PER_STICKER;
+  const into = stickerPoints() % PER_STICKER;
   $("sp-bar").style.width = (into / PER_STICKER) * 100 + "%";
   const left = PER_STICKER - into;
   $("sp-txt").textContent =
-    left === 1 ? "1 ord til neste klistremerke!" : left + " ord til neste klistremerke";
+    left === 1 ? "1 igjen til neste klistremerke!" : left + " igjen til neste klistremerke";
 }
 function flushRewards() {
   if (!$("reward").hidden || !rewards.length) return;
@@ -149,8 +163,7 @@ function flushRewards() {
     $("rw-e").textContent = "⭐";
     $("rw-n").textContent = "Du klarte det!";
     $("rw-p").textContent =
-      S.goal +
-      " ord i dag. " +
+      rw.text +
       (stats.streak.n > 1
         ? stats.streak.n + " dager på rad!"
         : "Kom tilbake i morgen for å starte en rekke.");
@@ -251,7 +264,7 @@ function next() {
     if (revealIdx >= current.length) $("hint").textContent = "";
     return;
   }
-  addWords(current.length);
+  addProgress(current.length);
   newSet();
 }
 /* ---------- Appen lytter ---------- */
@@ -299,7 +312,7 @@ function heardAll() {
   chime([660, 990], S.sound);
   $("hint").textContent = "Bra lest!";
   renderBottom();
-  addWords(current.length);
+  addProgress(current.length);
   const set = current;
   flashTimer = setTimeout(() => {
     if (current === set && $("reward").hidden) newSet();
@@ -307,7 +320,7 @@ function heardAll() {
 }
 /** Skipping in listening mode only counts the words that were actually heard. */
 function skipHeard() {
-  if (heard.size && !hearDone) addWords(heard.size);
+  if (heard.size && !hearDone) addProgress(heard.size);
   newSet();
 }
 
@@ -378,7 +391,7 @@ function answerTask(v, btn) {
   $("hint").textContent = "Riktig!";
   chime([660, 990], S.sound);
   // Same rule as Lytt: only a first-try answer counts, so guessing through the options earns nothing.
-  if (!task.wrong) addWords(1);
+  if (!task.wrong) addProgress(1);
   renderBottom();
   taskTimer = setTimeout(() => {
     if (S.mode === "regn" && $("reward").hidden) newTask();
@@ -448,7 +461,7 @@ function answerListen(v, btn) {
   if (listen.wrong) $("hint").textContent = "Riktig! Dette ordet øver vi mer på";
   else {
     $("hint").textContent = "Riktig!";
-    addWords(1);
+    addProgress(1);
   }
   renderBottom();
   taskTimer = setTimeout(() => {
@@ -537,7 +550,7 @@ function lynAnswer(ok) {
     save("ob-marked", [...marked]);
   }
   // A word the child couldn't read doesn't count towards stickers or the daily goal.
-  if (ok) addWords(1);
+  if (ok) addProgress(1);
   updateScore();
   lynWord();
 }
@@ -617,9 +630,12 @@ function applySize() {
   document.documentElement.style.setProperty("--word-scale", String(scale * crowd));
 }
 function syncUI() {
-  ["ord", "setning", "lyn", "regn", "lytt"].forEach(m =>
-    document.querySelector(`[data-mode="${m}"]`).setAttribute("aria-pressed", String(S.mode === m))
+  $$("[data-mode]").forEach(b => b.setAttribute("aria-pressed", String(S.mode === b.dataset.mode)));
+  $$("[data-area]").forEach(b =>
+    b.setAttribute("aria-pressed", String((b.dataset.area === "regn") === isMath()))
   );
+  $("modes").hidden = isMath();
+  $$(".f-read").forEach(f => (f.hidden = isMath()));
   $("f-count").hidden = S.mode !== "ord";
   $("f-length").hidden = S.mode !== "setning";
   $("f-hear").hidden = S.mode !== "ord" && S.mode !== "setning";
@@ -636,6 +652,7 @@ function syncUI() {
   press("flash", S.flash);
   press("list", S.list);
   press("goal", S.goal);
+  press("mgoal", S.mathGoal);
   press("dur", S.dur);
   press("max", S.max);
   $("custom-wrap").hidden = S.list !== "egen";
@@ -676,7 +693,9 @@ function setMode(m) {
   hearing = false;
   lyn.state = "idle";
   S.mode = m;
+  if (m !== "regn") S.readMode = m;
   syncUI();
+  renderProgress();
   $("timer").hidden = true;
   $("score").hidden = true;
   $("answers").hidden = true;
@@ -699,6 +718,9 @@ Object.entries(LISTS).forEach(([k, v]) => {
   $("list-opts").appendChild(b);
 });
 $$("[data-mode]").forEach(b => (b.onclick = () => setMode(b.dataset.mode)));
+$$("[data-area]").forEach(
+  b => (b.onclick = () => setMode(b.dataset.area === "regn" ? "regn" : S.readMode))
+);
 $$("[data-len]").forEach(
   b =>
     (b.onclick = () => {
@@ -718,6 +740,14 @@ $$("[data-goal]").forEach(
   b =>
     (b.onclick = () => {
       S.goal = +b.dataset.goal;
+      syncUI();
+      renderProgress();
+    })
+);
+$$("[data-mgoal]").forEach(
+  b =>
+    (b.onclick = () => {
+      S.mathGoal = +b.dataset.mgoal;
       syncUI();
       renderProgress();
     })
@@ -815,7 +845,7 @@ $("reset").onclick = () => {
 };
 function updateTotal() {
   $("total-txt").textContent =
-    `${stats.total} ord lest totalt · ${Object.keys(stats.stickers).length} av ${STICKERS.length} klistremerker`;
+    `${stats.total} ord lest · ${stats.math.total} ${stats.math.total === 1 ? "oppgave" : "oppgaver"} løst · ${Object.keys(stats.stickers).length} av ${STICKERS.length} klistremerker`;
 }
 $("reveal").onclick = () => {
   $("words").classList.remove("hidden");

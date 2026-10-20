@@ -21,37 +21,42 @@
   </head>
   <body>
     <div class="app">
-      <header class="top">
-        <div class="brand">Ordblikk</div>
-        <div class="seg" role="group" aria-label="Modus">
+      <div class="head">
+        <header class="top">
+          <div class="brand">Ordblikk</div>
+          <div class="seg" role="group" aria-label="Fag">
+            <button data-area="les">Lesing</button>
+            <button data-area="regn">Regning</button>
+          </div>
+          <button class="iconbtn" id="open-book" aria-label="Klistremerkebok">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z" />
+              <path d="M4 19V5" />
+              <path d="M12 7.5l1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z" />
+            </svg>
+          </button>
+          <button class="iconbtn" id="open-settings" aria-label="Innstillinger">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+              <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" />
+              <circle cx="16" cy="6" r="2" />
+              <circle cx="10" cy="12" r="2" />
+              <circle cx="18" cy="18" r="2" />
+            </svg>
+          </button>
+        </header>
+        <div class="seg sub" id="modes" role="group" aria-label="Lesemodus">
           <button id="m-ord" data-mode="ord">Ord</button>
           <button id="m-set" data-mode="setning">Setninger</button>
           <button id="m-lyn" data-mode="lyn">Lynrunde</button>
-          <button id="m-regn" data-mode="regn">Regning</button>
           <button id="m-lytt" data-mode="lytt">Lytt</button>
         </div>
-        <button class="iconbtn" id="open-book" aria-label="Klistremerkebok">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z" />
-            <path d="M4 19V5" />
-            <path d="M12 7.5l1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z" />
-          </svg>
-        </button>
-        <button class="iconbtn" id="open-settings" aria-label="Innstillinger">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
-            <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" />
-            <circle cx="16" cy="6" r="2" />
-            <circle cx="10" cy="12" r="2" />
-            <circle cx="18" cy="18" r="2" />
-          </svg>
-        </button>
-      </header>
+      </div>
 
       <section class="strip" aria-label="Fremgang">
         <div class="goal">
@@ -68,7 +73,7 @@
             />
             <text id="ring-n" x="23" y="27.5" text-anchor="middle">0</text>
           </svg>
-          <div><b id="goal-txt">0 / 30</b><small>ord i dag</small></div>
+          <div><b id="goal-txt">0 / 30</b><small id="goal-unit">ord i dag</small></div>
         </div>
         <div class="streak" id="streak">
           <svg viewBox="0 0 22 26" aria-hidden="true">
@@ -155,9 +160,16 @@
             Svaret er alltid et helt tall fra 0 til valgt grense. Gange og dele bruker gangetabellen
             opp til 10.
           </p>
+          <span class="label">Dagens mål</span>
+          <div class="row" id="math-goal-opts">
+            <button class="opt" data-mgoal="10">10 oppgaver</button>
+            <button class="opt" data-mgoal="20">20 oppgaver</button>
+            <button class="opt" data-mgoal="30">30 oppgaver</button>
+            <button class="opt" data-mgoal="50">50 oppgaver</button>
+          </div>
         </div>
 
-        <div class="field">
+        <div class="field f-read">
           <span class="label">Ordliste (Ord, Lynrunde og Lytt)</span>
           <div class="row" id="list-opts"></div>
           <div id="custom-wrap" hidden class="field">
@@ -169,7 +181,7 @@
           </div>
         </div>
 
-        <div class="field">
+        <div class="field f-read">
           <span class="label">Dagens mål</span>
           <div class="row" id="goal-opts">
             <button class="opt" data-goal="20">20 ord</button>
@@ -179,7 +191,7 @@
           </div>
         </div>
 
-        <div class="field">
+        <div class="field f-read">
           <span class="label">Lynrunde</span>
           <div class="row" id="dur-opts">
             <button class="opt" data-dur="30">30 sek</button>
@@ -192,7 +204,7 @@
           </p>
         </div>
 
-        <div class="field">
+        <div class="field f-read">
           <span class="label">Blinkvisning</span>
           <div class="row">
             <button class="opt" data-flash="0">Av</button>
@@ -214,7 +226,7 @@
           ><span>Lyd ved belønninger</span><input type="checkbox" id="sound"
         /></label>
 
-        <div class="field">
+        <div class="field f-read">
           <span class="label">Ord å øve mer på</span>
           <p class="small">
             Trykk på et ord i kortet for å merke det. Merkede ord dukker opp oftere.
@@ -236,7 +248,10 @@
         <h2>
           <span id="book-title">Klistremerkebok</span> <button class="opt" data-close>Lukk</button>
         </h2>
-        <p class="small">Du får et nytt dyr for hver 20. ord du leser. Kan du lese navnene?</p>
+        <p class="small">
+          Du får et nytt dyr for hver 20. gang du leser et ord eller løser en oppgave. Kan du lese
+          navnene?
+        </p>
         <div class="book" id="book"></div>
       </div>
     </section>
