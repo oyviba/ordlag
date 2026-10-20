@@ -330,7 +330,7 @@ function newTask() {
   do {
     t = mathTask(S.ops, S.max);
   } while (task && t.a === task.a && t.b === task.b && t.op === task.op && ++tries < 10);
-  task = t;
+  task = { ...t, wrong: 0 };
   taskDone = false;
   const box = $("words");
   box.hidden = false;
@@ -366,6 +366,7 @@ function answerTask(v, btn) {
     void btn.offsetWidth;
     btn.classList.add("wrong");
     btn.disabled = true;
+    task.wrong++;
     return;
   }
   taskDone = true;
@@ -376,7 +377,8 @@ function answerTask(v, btn) {
   [...$("answers").children].forEach(b => (b.disabled = true));
   $("hint").textContent = "Riktig!";
   chime([660, 990], S.sound);
-  addWords(1);
+  // Same rule as Lytt: only a first-try answer counts, so guessing through the options earns nothing.
+  if (!task.wrong) addWords(1);
   renderBottom();
   taskTimer = setTimeout(() => {
     if (S.mode === "regn" && $("reward").hidden) newTask();
@@ -534,7 +536,8 @@ function lynAnswer(ok) {
     marked.add(lyn.word);
     save("ob-marked", [...marked]);
   }
-  addWords(1);
+  // A word the child couldn't read doesn't count towards stickers or the daily goal.
+  if (ok) addWords(1);
   updateScore();
   lynWord();
 }
