@@ -3,9 +3,9 @@ import "@fontsource/andika/700.css";
 import "@fontsource/atkinson-hyperlegible/400.css";
 import "@fontsource/atkinson-hyperlegible/700.css";
 import "./style.css";
-import { LISTS, STICKERS, PER_STICKER, sp, sentence, OPS, mathTask } from "./data.js";
+import { LISTS, STICKERS, PER_STICKER, sp, sentence, OPS, mathTask, lookalikes } from "./data.js";
 import { load, save } from "./storage.js";
-import { chime, confetti, requestWake } from "./effects.js";
+import { chime, confetti, requestWake, canSpeak, missingVoice, speak } from "./effects.js";
 
 let S = Object.assign(
   {
@@ -42,6 +42,7 @@ let rewards = [];
 let task = null,
   taskDone = false,
   taskTimer = null;
+let listen = null;
 let lyn = { state: "idle", score: 0, combo: 0, missed: [], end: 0, tick: null, word: "" };
 
 /** @type {(id: string) => any} */
@@ -168,12 +169,14 @@ $("rw-ok").onclick = () => {
   $("scrim").hidden = true;
   flushRewards();
   if (S.mode === "regn" && taskDone && $("reward").hidden) newTask();
+  if (S.mode === "lytt" && listen?.done && $("reward").hidden) newListen();
 };
 
 /* ---------- Normal modes ---------- */
 function newSet() {
   clearTimeout(flashTimer);
   if (S.mode === "regn") return newTask();
+  if (S.mode === "lytt") return newListen();
   if (S.mode === "ord") {
     current = pickWords(S.count);
     revealIdx = current.length;
@@ -270,6 +273,7 @@ function newTask() {
   void box.offsetWidth;
   box.classList.add("pop");
   const ans = $("answers");
+  ans.className = "answers";
   ans.hidden = false;
   ans.innerHTML = "";
   task.opts.forEach(v => {
@@ -306,6 +310,77 @@ function answerTask(v, btn) {
   taskTimer = setTimeout(() => {
     if (S.mode === "regn" && $("reward").hidden) newTask();
   }, 1100);
+}
+
+/* ---------- Lytt ---------- */
+function newListen() {
+  clearTimeout(taskTimer);
+  const p = pool();
+  const [word] = pickWords(1);
+  const opts = [word, ...lookalikes(word, p, 3)].sort(() => Math.random() - 0.5);
+  listen = { word, wrong: 0, done: false };
+  const box = $("words");
+  box.hidden = false;
+  $("panel").hidden = true;
+  $("reveal").hidden = true;
+  box.classList.remove("hidden", "pop");
+  box.innerHTML = `<button type="button" class="say" id="say" aria-label="Hør ordet igjen">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" />
+    </svg></button>`;
+  $("say").onclick = say;
+  const ans = $("answers");
+  ans.className = "answers wordy";
+  ans.hidden = false;
+  ans.innerHTML = "";
+  opts.forEach(v => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ans";
+    b.textContent = v;
+    b.onclick = () => answerListen(v, b);
+    ans.appendChild(b);
+  });
+  $("hint").textContent = canSpeak ? "Hva hører du? Trykk på riktig ord" : "";
+  renderBottom();
+  say();
+}
+function say() {
+  if (!canSpeak) {
+    $("hint").textContent = "Denne nettleseren kan ikke lese opp ord";
+    return;
+  }
+  if (missingVoice()) $("hint").textContent = "Fant ingen norsk stemme på enheten";
+  speak(listen.word);
+}
+function answerListen(v, btn) {
+  if (listen.done) return;
+  requestWake();
+  if (v !== listen.word) {
+    btn.classList.remove("wrong");
+    void btn.offsetWidth;
+    btn.classList.add("wrong");
+    btn.disabled = true;
+    listen.wrong++;
+    marked.add(listen.word);
+    save("ob-marked", [...marked]);
+    say();
+    return;
+  }
+  listen.done = true;
+  btn.classList.add("right");
+  [...$("answers").children].forEach(b => (b.disabled = true));
+  chime([660, 990], S.sound);
+  // Only a first-try hit counts as read, so guessing through the options earns nothing.
+  if (listen.wrong) $("hint").textContent = "Riktig! Dette ordet øver vi mer på";
+  else {
+    $("hint").textContent = "Riktig!";
+    addWords(1);
+  }
+  renderBottom();
+  taskTimer = setTimeout(() => {
+    if (S.mode === "lytt" && $("reward").hidden) newListen();
+  }, 1300);
 }
 
 /* ---------- Lynrunde ---------- */
@@ -424,9 +499,10 @@ function lynFinish() {
 /* ---------- Bottom bar ---------- */
 function renderBottom() {
   const b = $("bottom");
-  if (S.mode === "regn") {
-    b.innerHTML = `<button class="${taskDone ? "next" : "btn2"}" id="next">${taskDone ? "Neste" : "Hopp over"}</button>`;
-    $("next").onclick = newTask;
+  if (S.mode === "regn" || S.mode === "lytt") {
+    const done = S.mode === "regn" ? taskDone : !!listen?.done;
+    b.innerHTML = `<button class="${done ? "next" : "btn2"}" id="next">${done ? "Neste" : "Hopp over"}</button>`;
+    $("next").onclick = S.mode === "regn" ? newTask : newListen;
   } else if (S.mode !== "lyn") {
     const complete = revealIdx >= current.length;
     b.innerHTML = `<button class="next" id="next">${complete ? "Neste" : "Neste ord"}</button>`;
@@ -451,7 +527,7 @@ function applySize() {
       ? 0.78
       : S.mode === "lyn"
         ? 1.15
-        : S.mode === "regn"
+        : S.mode === "regn" || S.mode === "lytt"
           ? 1
           : S.count >= 5
             ? 0.72
@@ -461,7 +537,7 @@ function applySize() {
   document.documentElement.style.setProperty("--word-scale", String(scale * crowd));
 }
 function syncUI() {
-  ["ord", "setning", "lyn", "regn"].forEach(m =>
+  ["ord", "setning", "lyn", "regn", "lytt"].forEach(m =>
     document.querySelector(`[data-mode="${m}"]`).setAttribute("aria-pressed", String(S.mode === m))
   );
   $("f-count").hidden = S.mode !== "ord";
@@ -534,7 +610,7 @@ Object.entries(LISTS).forEach(([k, v]) => {
     S.list = k;
     lastShown = new Set();
     syncUI();
-    if (S.mode === "ord") newSet();
+    if (S.mode === "ord" || S.mode === "lytt") newSet();
   };
   $("list-opts").appendChild(b);
 });
@@ -619,7 +695,7 @@ $("custom").oninput = e => {
   save("ob-custom", e.target.value);
 };
 $("custom").onchange = () => {
-  if (S.mode === "ord") newSet();
+  if (S.mode === "ord" || S.mode === "lytt") newSet();
 };
 $("clear-marked").onclick = () => {
   marked.clear();
@@ -714,6 +790,19 @@ document.addEventListener("keydown", e => {
     } else if (go && taskDone && t.tagName !== "BUTTON") {
       e.preventDefault();
       newTask();
+    }
+    return;
+  }
+  if (S.mode === "lytt") {
+    const k = +e.key,
+      opt = $("answers").children[k - 1];
+    if (k >= 1 && k <= 4 && opt && !opt.disabled) {
+      e.preventDefault();
+      opt.click();
+    } else if (go && t.tagName !== "BUTTON") {
+      e.preventDefault();
+      if (listen.done) newListen();
+      else say();
     }
     return;
   }

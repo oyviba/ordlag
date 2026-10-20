@@ -193,3 +193,28 @@ export function mathTask(ops, max) {
   }
   return { a, b, op, ans, opts: [...opts].sort(() => Math.random() - 0.5) };
 }
+
+/* Look-alike distractors for Lytt: closest words by edit distance, nudged towards same first letter and length. */
+function lev(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++)
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+export function lookalikes(word, pool, n) {
+  const score = w =>
+    lev(word, w) +
+    (w[0] === word[0] ? 0 : 0.5) +
+    Math.abs(w.length - word.length) * 0.3 +
+    Math.random() * 0.8;
+  return pool
+    .filter(w => w !== word)
+    .map(w => /** @type {[number, string]} */ ([score(w), w]))
+    .sort((a, b) => a[0] - b[0])
+    .slice(0, n)
+    .map(x => x[1]);
+}

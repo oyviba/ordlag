@@ -1,6 +1,6 @@
 # Ordblikk
 
-Leseøving og regning for barn: ordbilder, korte setninger, lynrunde og regnestykker (+ − · :), med klistremerker som belønning.
+Leseøving og regning for barn: ordbilder, korte setninger, lynrunde, lytt-og-velg og regnestykker (+ − · :), med klistremerker som belønning.
 Installerbar web-app (PWA) som fungerer uten nett etter første besøk. All fremgang lagres lokalt på enheten.
 
 ## Kom i gang

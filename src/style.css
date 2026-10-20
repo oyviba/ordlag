@@ -400,6 +400,33 @@ textarea:focus-visible {
   }
 }
 
+/* Lytt */
+.say {
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--chip);
+  box-shadow: 0 4px 0 var(--line);
+  display: grid;
+  place-items: center;
+}
+.say svg {
+  width: 55%;
+  height: 55%;
+  stroke: var(--ink);
+}
+.say:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--line);
+}
+.answers.wordy {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.answers.wordy .ans {
+  overflow-wrap: anywhere;
+}
+
 /* Lynrunde */
 .timer {
   position: absolute;
@@ -821,12 +848,20 @@ input[type="range"] {
   .brand {
     display: none;
   }
+  .top {
+    gap: 6px;
+  }
   .seg {
     margin-right: auto;
+    min-width: 0;
   }
   .seg button {
-    padding: 7px 7px;
-    font-size: 0.8rem;
+    padding: 7px 6px;
+    font-size: 0.78rem;
+  }
+  .iconbtn {
+    width: 38px;
+    height: 38px;
   }
   .goal small,
   .streak small {
@@ -834,5 +869,21 @@ input[type="range"] {
   }
   .strip {
     gap: 10px;
+  }
+}
+@media (max-width: 380px) {
+  .top {
+    gap: 4px;
+  }
+  .seg button {
+    padding: 6px 4px;
+    font-size: 0.7rem;
+  }
+  .seg {
+    padding: 2px;
+  }
+  .iconbtn {
+    width: 34px;
+    height: 34px;
   }
 }
