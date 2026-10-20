@@ -71,3 +71,28 @@ export async function requestWake() {
     wake.addEventListener("release", () => (wake = null));
   } catch {}
 }
+
+/* Read a word aloud with a Norwegian voice when the device has one. */
+export const canSpeak = "speechSynthesis" in window;
+let voice = null;
+function pickVoice() {
+  const vs = speechSynthesis.getVoices();
+  voice =
+    vs.find(v => /^(nb|no)([-_]|$)/i.test(v.lang)) ||
+    vs.find(v => /^nn([-_]|$)/i.test(v.lang)) ||
+    null;
+}
+if (canSpeak) {
+  pickVoice();
+  speechSynthesis.addEventListener("voiceschanged", pickVoice);
+}
+export const missingVoice = () => canSpeak && !voice && speechSynthesis.getVoices().length > 0;
+export function speak(text) {
+  if (!canSpeak) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = voice ? voice.lang : "nb-NO";
+  if (voice) u.voice = voice;
+  u.rate = 0.8;
+  speechSynthesis.speak(u);
+}
