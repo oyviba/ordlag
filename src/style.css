@@ -107,6 +107,15 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.seg.sub {
+  align-self: center;
+  margin: 0;
+}
 .top {
   display: flex;
   align-items: center;
