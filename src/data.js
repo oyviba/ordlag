@@ -287,3 +287,132 @@ export function lookalikes(word, pool, n) {
     .slice(0, n)
     .map(x => x[1]);
 }
+
+/* Engelsk: [picture, English, Norwegian]. Every word has an unambiguous emoji, so no reading is needed in Hør. */
+export const EN = {
+  dyr: {
+    name: "Dyr",
+    words: [
+      ["🐱", "cat", "katt"],
+      ["🐶", "dog", "hund"],
+      ["🐮", "cow", "ku"],
+      ["🐷", "pig", "gris"],
+      ["🐴", "horse", "hest"],
+      ["🐑", "sheep", "sau"],
+      ["🐟", "fish", "fisk"],
+      ["🐦", "bird", "fugl"],
+      ["🐭", "mouse", "mus"],
+      ["🐰", "rabbit", "kanin"],
+      ["🐻", "bear", "bjørn"],
+      ["🦁", "lion", "løve"],
+      ["🐘", "elephant", "elefant"],
+      ["🐸", "frog", "frosk"],
+      ["🦆", "duck", "and"],
+    ],
+  },
+  farger: {
+    name: "Farger",
+    words: [
+      ["🔴", "red", "rød"],
+      ["🔵", "blue", "blå"],
+      ["🟢", "green", "grønn"],
+      ["🟡", "yellow", "gul"],
+      ["🟠", "orange", "oransje"],
+      ["🟣", "purple", "lilla"],
+      ["⚫", "black", "svart"],
+      ["⚪", "white", "hvit"],
+      ["🟤", "brown", "brun"],
+    ],
+  },
+  tall: {
+    name: "Tall",
+    words: [
+      ["1️⃣", "one", "en"],
+      ["2️⃣", "two", "to"],
+      ["3️⃣", "three", "tre"],
+      ["4️⃣", "four", "fire"],
+      ["5️⃣", "five", "fem"],
+      ["6️⃣", "six", "seks"],
+      ["7️⃣", "seven", "sju"],
+      ["8️⃣", "eight", "åtte"],
+      ["9️⃣", "nine", "ni"],
+      ["🔟", "ten", "ti"],
+    ],
+  },
+  mat: {
+    name: "Mat",
+    words: [
+      ["🍎", "apple", "eple"],
+      ["🍌", "banana", "banan"],
+      ["🍐", "pear", "pære"],
+      ["🍓", "strawberry", "jordbær"],
+      ["🥕", "carrot", "gulrot"],
+      ["🍞", "bread", "brød"],
+      ["🧀", "cheese", "ost"],
+      ["🥛", "milk", "melk"],
+      ["🥚", "egg", "egg"],
+      ["🍰", "cake", "kake"],
+      ["🍦", "ice cream", "is"],
+      ["🍕", "pizza", "pizza"],
+    ],
+  },
+  kropp: {
+    name: "Kroppen",
+    words: [
+      ["👁️", "eye", "øye"],
+      ["👂", "ear", "øre"],
+      ["👃", "nose", "nese"],
+      ["👄", "mouth", "munn"],
+      ["🦷", "tooth", "tann"],
+      ["✋", "hand", "hånd"],
+      ["🦵", "leg", "bein"],
+      ["🦶", "foot", "fot"],
+    ],
+  },
+  ting: {
+    name: "Ting",
+    words: [
+      ["🏠", "house", "hus"],
+      ["🚗", "car", "bil"],
+      ["🚲", "bike", "sykkel"],
+      ["📖", "book", "bok"],
+      ["⚽", "ball", "ball"],
+      ["👟", "shoe", "sko"],
+      ["🛏️", "bed", "seng"],
+      ["🪑", "chair", "stol"],
+      ["🚪", "door", "dør"],
+      ["⏰", "clock", "klokke"],
+      ["✏️", "pencil", "blyant"],
+    ],
+  },
+  natur: {
+    name: "Natur",
+    words: [
+      ["☀️", "sun", "sol"],
+      ["🌙", "moon", "måne"],
+      ["⭐", "star", "stjerne"],
+      ["☁️", "cloud", "sky"],
+      ["🌧️", "rain", "regn"],
+      ["❄️", "snow", "snø"],
+      ["🌳", "tree", "tre"],
+      ["🌸", "flower", "blomst"],
+      ["🌊", "sea", "hav"],
+    ],
+  },
+};
+/** One English word from the chosen topics, with three wrong pictures from the same topic. */
+export function enTask(topics, last) {
+  const keys = topics.filter(t => EN[t]);
+  let topic, item;
+  do {
+    topic = EN[r(keys.length ? keys : ["dyr"])].words;
+    item = r(topic);
+  } while (item[1] === last);
+  const wrong = topic.filter(w => w !== item).sort(() => Math.random() - 0.5);
+  return {
+    pic: item[0],
+    en: item[1],
+    no: item[2],
+    opts: [item, ...wrong.slice(0, 3)].sort(() => Math.random() - 0.5).map(w => w[0]),
+  };
+}

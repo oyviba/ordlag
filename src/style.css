@@ -452,6 +452,21 @@ textarea:focus-visible {
   overflow-wrap: anywhere;
 }
 
+/* Engelsk */
+.answers.pics .ans {
+  font-family: system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: calc(var(--word-scale) * clamp(2.4rem, 8vw, 3.6rem));
+  padding: 10px 4px;
+}
+.answers.pics .ans.right {
+  background: color-mix(in srgb, var(--good) 25%, var(--chip));
+  color: inherit;
+}
+#en-word.solved {
+  color: var(--good);
+  animation: pop 0.32s cubic-bezier(0.3, 1.5, 0.6, 1) both;
+}
+
 /* Lynrunde */
 .timer {
   position: absolute;

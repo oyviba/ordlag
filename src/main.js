@@ -3,7 +3,18 @@ import "@fontsource/andika/700.css";
 import "@fontsource/atkinson-hyperlegible/400.css";
 import "@fontsource/atkinson-hyperlegible/700.css";
 import "./style.css";
-import { LISTS, STICKERS, PER_STICKER, sp, sentence, OPS, mathTask, lookalikes } from "./data.js";
+import {
+  LISTS,
+  STICKERS,
+  PER_STICKER,
+  sp,
+  sentence,
+  OPS,
+  mathTask,
+  lookalikes,
+  EN,
+  enTask,
+} from "./data.js";
 import { load, save } from "./storage.js";
 import { canHear, matches, startHearing, finishHearing, stopHearing } from "./hear.js";
 import { chime, confetti, requestWake, canSpeak, missingVoice, speak } from "./effects.js";
@@ -12,6 +23,7 @@ let S = Object.assign(
   {
     mode: "ord",
     readMode: "ord",
+    engMode: "ehor",
     count: 1,
     list: "n1",
     flash: 0,
@@ -25,18 +37,25 @@ let S = Object.assign(
     sound: true,
     ops: ["+", "-"],
     max: 10,
+    topics: ["dyr", "farger", "tall"],
+    engGoal: 10,
   },
   load("ob-settings", {})
 );
-if (S.mode !== "regn") S.readMode = S.mode;
+const ENG_MODES = ["ehor", "eles"];
+/** "les", "regn" or "eng" for a mode. */
+const areaOf = m => (m === "regn" ? "regn" : ENG_MODES.includes(m) ? "eng" : "les");
+if (areaOf(S.mode) === "les") S.readMode = S.mode;
+if (areaOf(S.mode) === "eng") S.engMode = S.mode;
 let marked = new Set(load("ob-marked", []));
 LISTS.egen.words = load("ob-custom", "");
-// The top-level total/today are reading; math keeps its own count. Both feed the shared stickers and streak.
+// The top-level total/today are reading; math and English keep their own counts. All feed the shared stickers and streak.
 const freshStats = () => ({
   total: 0,
   stickers: {},
   today: { date: "", n: 0 },
   math: { total: 0, today: { date: "", n: 0 } },
+  eng: { total: 0, today: { date: "", n: 0 } },
   streak: { last: "", n: 0 },
   best: {},
 });
@@ -50,6 +69,7 @@ let task = null,
   taskDone = false,
   taskTimer = null;
 let listen = null;
+let eng = null;
 let heard = new Set(),
   hearing = false,
   hearDone = false;
@@ -61,9 +81,11 @@ const $ = id => document.getElementById(id);
 const $$ = sel => document.querySelectorAll(sel);
 const clean = w => w.toLowerCase().replace(/[.,!?]/g, "");
 const isMath = () => S.mode === "regn";
-const side = () => (isMath() ? stats.math : stats);
-const goal = () => (isMath() ? S.mathGoal : S.goal);
-const stickerPoints = () => stats.total + stats.math.total;
+const isEng = () => areaOf(S.mode) === "eng";
+const side = () => (isMath() ? stats.math : isEng() ? stats.eng : stats);
+const goal = () => (isMath() ? S.mathGoal : isEng() ? S.engGoal : S.goal);
+const unit = () => (isMath() ? "oppgaver" : isEng() ? "engelske ord" : "ord");
+const stickerPoints = () => stats.total + stats.math.total + stats.eng.total;
 const day = (off = 0) => new Date(Date.now() - off * 864e5).toLocaleDateString("sv");
 
 /* ---------- Words ---------- */
@@ -97,7 +119,7 @@ function pickWords(n) {
 }
 
 /* ---------- Progress & rewards ---------- */
-/** Count n words read (or math tasks solved, in Regning). */
+/** Count n words read (or math tasks solved, in Regning; English words known, in Engelsk). */
 function addProgress(n) {
   const d = day();
   const sd = side();
@@ -113,7 +135,7 @@ function addProgress(n) {
   const earned = Math.floor(stickerPoints() / PER_STICKER) - Math.floor(before / PER_STICKER);
   for (let i = 0; i < earned; i++) rewards.push({ type: "sticker", idx: awardSticker() });
   if (!goalBefore && sd.today.n >= goal())
-    rewards.push({ type: "goal", text: goal() + (isMath() ? " oppgaver" : " ord") + " i dag. " });
+    rewards.push({ type: "goal", text: goal() + " " + unit() + " i dag. " });
   save("ob-stats", stats);
   renderProgress();
   if (lyn.state !== "running") flushRewards();
@@ -132,7 +154,7 @@ function renderProgress() {
   $("ring").style.stroke = frac >= 1 ? "var(--accent)" : "";
   $("ring-n").textContent = n;
   $("goal-txt").textContent = n + " / " + goal();
-  $("goal-unit").textContent = isMath() ? "oppgaver i dag" : "ord i dag";
+  $("goal-unit").textContent = unit() + " i dag";
   const live = stats.streak.last === day() || stats.streak.last === day(1);
   const sn = live ? stats.streak.n : 0;
   $("streak-n").textContent = sn;
@@ -188,6 +210,7 @@ $("rw-ok").onclick = () => {
   flushRewards();
   if (S.mode === "regn" && taskDone && $("reward").hidden) newTask();
   if (S.mode === "lytt" && listen?.done && $("reward").hidden) newListen();
+  if (isEng() && eng?.done && $("reward").hidden) newEng();
   if (hearOn() && hearDone && $("reward").hidden) newSet();
 };
 
@@ -200,6 +223,7 @@ function newSet() {
   heard = new Set();
   if (S.mode === "regn") return newTask();
   if (S.mode === "lytt") return newListen();
+  if (isEng()) return newEng();
   if (S.mode === "ord") {
     current = pickWords(S.count);
     revealIdx = current.length;
@@ -399,6 +423,9 @@ function answerTask(v, btn) {
 }
 
 /* ---------- Lytt ---------- */
+const SPEAKER = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" />
+    </svg>`;
 function newListen() {
   clearTimeout(taskTimer);
   const p = pool();
@@ -410,10 +437,7 @@ function newListen() {
   $("panel").hidden = true;
   $("reveal").hidden = true;
   box.classList.remove("hidden", "pop");
-  box.innerHTML = `<button type="button" class="say" id="say" aria-label="Hør ordet igjen">
-    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" />
-    </svg></button>`;
+  box.innerHTML = `<button type="button" class="say" id="say" aria-label="Hør ordet igjen">${SPEAKER}</button>`;
   $("say").onclick = say;
   const ans = $("answers");
   ans.className = "answers wordy";
@@ -467,6 +491,76 @@ function answerListen(v, btn) {
   taskTimer = setTimeout(() => {
     if (S.mode === "lytt" && $("reward").hidden) newListen();
   }, 1300);
+}
+
+/* ---------- Engelsk ---------- */
+function newEng() {
+  clearTimeout(taskTimer);
+  eng = { ...enTask(S.topics, eng?.en), wrong: 0, done: false };
+  const hear = S.mode === "ehor";
+  const box = $("words");
+  box.hidden = false;
+  $("panel").hidden = true;
+  $("reveal").hidden = true;
+  box.classList.remove("hidden", "pop");
+  // In Hør the written word stays hidden until the right picture is found, so the sound comes first.
+  box.innerHTML = `<button type="button" class="say" id="say" aria-label="Hør ordet på engelsk">${SPEAKER}</button>
+    <span class="word" id="en-word" lang="en"${hear ? " hidden" : ""}>${eng.en}</span>`;
+  $("say").onclick = sayEng;
+  void box.offsetWidth;
+  box.classList.add("pop");
+  const ans = $("answers");
+  ans.className = "answers pics";
+  ans.hidden = false;
+  ans.innerHTML = "";
+  eng.opts.forEach(v => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ans";
+    b.textContent = v;
+    b.onclick = () => answerEng(v, b);
+    ans.appendChild(b);
+  });
+  $("hint").textContent = hear
+    ? "Hva hører du? Trykk på riktig bilde"
+    : "Les ordet og trykk på riktig bilde";
+  renderBottom();
+  if (hear) sayEng();
+}
+function sayEng() {
+  if (!canSpeak) {
+    $("hint").textContent = "Denne nettleseren kan ikke lese opp ord";
+    return;
+  }
+  if (missingVoice("en")) $("hint").textContent = "Fant ingen engelsk stemme på enheten";
+  speak(eng.en, "en");
+}
+function answerEng(v, btn) {
+  if (eng.done) return;
+  requestWake();
+  if (v !== eng.pic) {
+    btn.classList.remove("wrong");
+    void btn.offsetWidth;
+    btn.classList.add("wrong");
+    btn.disabled = true;
+    eng.wrong++;
+    if (S.mode === "ehor") sayEng();
+    return;
+  }
+  eng.done = true;
+  btn.classList.add("right");
+  [...$("answers").children].forEach(b => (b.disabled = true));
+  $("en-word").hidden = false;
+  $("en-word").classList.add("solved");
+  chime([660, 990], S.sound);
+  $("hint").textContent = `Riktig! «${eng.en}» betyr «${eng.no}»`;
+  // Same rule as Lytt and Regning: only a first-try answer counts.
+  if (!eng.wrong) addProgress(1);
+  renderBottom();
+  sayEng();
+  taskTimer = setTimeout(() => {
+    if (isEng() && $("reward").hidden) newEng();
+  }, 2200);
 }
 
 /* ---------- Lynrunde ---------- */
@@ -586,10 +680,10 @@ function lynFinish() {
 /* ---------- Bottom bar ---------- */
 function renderBottom() {
   const b = $("bottom");
-  if (S.mode === "regn" || S.mode === "lytt") {
-    const done = S.mode === "regn" ? taskDone : !!listen?.done;
+  if (S.mode === "regn" || S.mode === "lytt" || isEng()) {
+    const done = S.mode === "regn" ? taskDone : isEng() ? !!eng?.done : !!listen?.done;
     b.innerHTML = `<button class="${done ? "next" : "btn2"}" id="next">${done ? "Neste" : "Hopp over"}</button>`;
-    $("next").onclick = S.mode === "regn" ? newTask : newListen;
+    $("next").onclick = S.mode === "regn" ? newTask : isEng() ? newEng : newListen;
   } else if (hearOn()) {
     b.innerHTML = hearDone
       ? `<button class="next" id="next">Neste</button>`
@@ -620,7 +714,7 @@ function applySize() {
       ? 0.78
       : S.mode === "lyn"
         ? 1.15
-        : S.mode === "regn" || S.mode === "lytt"
+        : S.mode === "regn" || S.mode === "lytt" || isEng()
           ? 1
           : S.count >= 5
             ? 0.72
@@ -632,14 +726,19 @@ function applySize() {
 function syncUI() {
   $$("[data-mode]").forEach(b => b.setAttribute("aria-pressed", String(S.mode === b.dataset.mode)));
   $$("[data-area]").forEach(b =>
-    b.setAttribute("aria-pressed", String((b.dataset.area === "regn") === isMath()))
+    b.setAttribute("aria-pressed", String(b.dataset.area === areaOf(S.mode)))
   );
-  $("modes").hidden = isMath();
-  $$(".f-read").forEach(f => (f.hidden = isMath()));
+  $("modes").hidden = areaOf(S.mode) !== "les";
+  $("eng-modes").hidden = !isEng();
+  $$(".f-read").forEach(f => (f.hidden = areaOf(S.mode) !== "les"));
   $("f-count").hidden = S.mode !== "ord";
   $("f-length").hidden = S.mode !== "setning";
   $("f-hear").hidden = S.mode !== "ord" && S.mode !== "setning";
   $("f-math").hidden = S.mode !== "regn";
+  $("f-eng").hidden = !isEng();
+  $$("[data-topic]").forEach(b =>
+    b.setAttribute("aria-pressed", String(S.topics.includes(b.dataset.topic)))
+  );
   $$("[data-op]").forEach(b =>
     b.setAttribute("aria-pressed", String(S.ops.includes(b.dataset.op)))
   );
@@ -653,6 +752,7 @@ function syncUI() {
   press("list", S.list);
   press("goal", S.goal);
   press("mgoal", S.mathGoal);
+  press("egoal", S.engGoal);
   press("dur", S.dur);
   press("max", S.max);
   $("custom-wrap").hidden = S.list !== "egen";
@@ -693,7 +793,8 @@ function setMode(m) {
   hearing = false;
   lyn.state = "idle";
   S.mode = m;
-  if (m !== "regn") S.readMode = m;
+  if (areaOf(m) === "les") S.readMode = m;
+  if (areaOf(m) === "eng") S.engMode = m;
   syncUI();
   renderProgress();
   $("timer").hidden = true;
@@ -718,8 +819,24 @@ Object.entries(LISTS).forEach(([k, v]) => {
   $("list-opts").appendChild(b);
 });
 $$("[data-mode]").forEach(b => (b.onclick = () => setMode(b.dataset.mode)));
+Object.entries(EN).forEach(([k, v]) => {
+  const b = document.createElement("button");
+  b.className = "opt";
+  b.dataset.topic = k;
+  b.textContent = v.words[0][0] + " " + v.name;
+  b.onclick = () => {
+    if (S.topics.includes(k)) {
+      if (S.topics.length > 1) S.topics = S.topics.filter(t => t !== k);
+    } else S.topics = [...S.topics, k];
+    syncUI();
+    if (isEng()) newEng();
+  };
+  $("topic-opts").appendChild(b);
+});
 $$("[data-area]").forEach(
-  b => (b.onclick = () => setMode(b.dataset.area === "regn" ? "regn" : S.readMode))
+  b =>
+    (b.onclick = () =>
+      setMode({ regn: "regn", eng: S.engMode, les: S.readMode }[b.dataset.area] || S.readMode))
 );
 $$("[data-len]").forEach(
   b =>
@@ -748,6 +865,14 @@ $$("[data-mgoal]").forEach(
   b =>
     (b.onclick = () => {
       S.mathGoal = +b.dataset.mgoal;
+      syncUI();
+      renderProgress();
+    })
+);
+$$("[data-egoal]").forEach(
+  b =>
+    (b.onclick = () => {
+      S.engGoal = +b.dataset.egoal;
       syncUI();
       renderProgress();
     })
@@ -845,7 +970,7 @@ $("reset").onclick = () => {
 };
 function updateTotal() {
   $("total-txt").textContent =
-    `${stats.total} ord lest · ${stats.math.total} ${stats.math.total === 1 ? "oppgave" : "oppgaver"} løst · ${Object.keys(stats.stickers).length} av ${STICKERS.length} klistremerker`;
+    `${stats.total} ord lest · ${stats.math.total} ${stats.math.total === 1 ? "oppgave" : "oppgaver"} løst · ${stats.eng.total} engelske ord · ${Object.keys(stats.stickers).length} av ${STICKERS.length} klistremerker`;
 }
 $("reveal").onclick = () => {
   $("words").classList.remove("hidden");
@@ -915,7 +1040,7 @@ document.addEventListener("keydown", e => {
     }
     return;
   }
-  if (S.mode === "lytt") {
+  if (S.mode === "lytt" || isEng()) {
     const k = +e.key,
       opt = $("answers").children[k - 1];
     if (k >= 1 && k <= 4 && opt && !opt.disabled) {
@@ -923,7 +1048,10 @@ document.addEventListener("keydown", e => {
       opt.click();
     } else if (go && t.tagName !== "BUTTON") {
       e.preventDefault();
-      if (listen.done) newListen();
+      if (isEng()) {
+        if (eng.done) newEng();
+        else sayEng();
+      } else if (listen.done) newListen();
       else say();
     }
     return;
