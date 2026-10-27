@@ -72,26 +72,31 @@ export async function requestWake() {
   } catch {}
 }
 
-/* Read a word aloud with a Norwegian voice when the device has one. */
+/* Read a word aloud with a Norwegian (or, for Engelsk, English) voice when the device has one. */
 export const canSpeak = "speechSynthesis" in window;
-let voice = null;
-function pickVoice() {
+const VOICE = {
+  nb: [/^(nb|no)([-_]|$)/i, /^nn([-_]|$)/i],
+  en: [/^en[-_]GB$/i, /^en[-_]US$/i, /^en([-_]|$)/i],
+};
+const LANG = { nb: "nb-NO", en: "en-GB" };
+let voices = {};
+function pickVoices() {
   const vs = speechSynthesis.getVoices();
-  voice =
-    vs.find(v => /^(nb|no)([-_]|$)/i.test(v.lang)) ||
-    vs.find(v => /^nn([-_]|$)/i.test(v.lang)) ||
-    null;
+  for (const [lang, tests] of Object.entries(VOICE))
+    voices[lang] = tests.map(t => vs.find(v => t.test(v.lang))).find(Boolean) || null;
 }
 if (canSpeak) {
-  pickVoice();
-  speechSynthesis.addEventListener("voiceschanged", pickVoice);
+  pickVoices();
+  speechSynthesis.addEventListener("voiceschanged", pickVoices);
 }
-export const missingVoice = () => canSpeak && !voice && speechSynthesis.getVoices().length > 0;
-export function speak(text) {
+export const missingVoice = (lang = "nb") =>
+  canSpeak && !voices[lang] && speechSynthesis.getVoices().length > 0;
+export function speak(text, lang = "nb") {
   if (!canSpeak) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = voice ? voice.lang : "nb-NO";
+  const voice = voices[lang];
+  u.lang = voice ? voice.lang : LANG[lang];
   if (voice) u.voice = voice;
   u.rate = 0.8;
   speechSynthesis.speak(u);

@@ -6,7 +6,7 @@
     <title>Ordblikk</title>
     <meta
       name="description"
-      content="Leseøving og regning for barn: ordbilder, korte setninger, lynrunde og regnestykker, med klistremerker som belønning."
+      content="Leseøving, regning og engelsk for barn: ordbilder, korte setninger, lynrunde, regnestykker og engelske ord, med klistremerker som belønning."
     />
     <meta name="theme-color" content="#e6eef5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#111925" media="(prefers-color-scheme: dark)" />
@@ -27,6 +27,7 @@
           <div class="seg" role="group" aria-label="Fag">
             <button data-area="les">Lesing</button>
             <button data-area="regn">Regning</button>
+            <button data-area="eng">Engelsk</button>
           </div>
           <button class="iconbtn" id="open-book" aria-label="Klistremerkebok">
             <svg
@@ -55,6 +56,10 @@
           <button id="m-set" data-mode="setning">Setninger</button>
           <button id="m-lyn" data-mode="lyn">Lynrunde</button>
           <button id="m-lytt" data-mode="lytt">Lytt</button>
+        </div>
+        <div class="seg sub" id="eng-modes" role="group" aria-label="Engelskmodus">
+          <button data-mode="ehor">Hør</button>
+          <button data-mode="eles">Les</button>
         </div>
       </div>
 
@@ -166,6 +171,22 @@
             <button class="opt" data-mgoal="20">20 oppgaver</button>
             <button class="opt" data-mgoal="30">30 oppgaver</button>
             <button class="opt" data-mgoal="50">50 oppgaver</button>
+          </div>
+        </div>
+
+        <div class="field" id="f-eng">
+          <span class="label">Temaer</span>
+          <div class="row" id="topic-opts"></div>
+          <p class="small">
+            I «Hør» sier appen et engelsk ord, og barnet trykker på riktig bilde. I «Les» står ordet
+            skrevet, og barnet kan trykke på høyttaleren for å høre det. Etter riktig svar vises hva
+            ordet betyr på norsk.
+          </p>
+          <span class="label">Dagens mål</span>
+          <div class="row" id="eng-goal-opts">
+            <button class="opt" data-egoal="10">10 ord</button>
+            <button class="opt" data-egoal="20">20 ord</button>
+            <button class="opt" data-egoal="30">30 ord</button>
           </div>
         </div>
 

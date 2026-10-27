@@ -1,11 +1,12 @@
 # Ordblikk
 
-Leseøving og regning for barn, i to deler med hvert sitt dagsmål:
+Leseøving, regning og engelsk for barn, i tre deler med hvert sitt dagsmål:
 
 - **Lesing:** ordbilder, korte setninger, lynrunde og lytt-og-velg, med valgfri talegjenkjenning som hører om ordene blir lest.
 - **Regning:** regnestykker med + − · :.
+- **Engelsk:** hør eller les et engelsk ord og trykk på riktig bilde, med temaer som dyr, farger, tall og mat.
 
-Begge deler gir poeng til de samme klistremerkene og den samme dagsrekka.
+Alle delene gir poeng til de samme klistremerkene og den samme dagsrekka.
 Installerbar web-app (PWA) som fungerer uten nett etter første besøk. All fremgang lagres lokalt på enheten.
 
 ## Kom i gang
@@ -27,7 +28,7 @@ På iPad/iPhone: åpne siden i Safari → Del → «Legg til på Hjem-skjerm».
 
 - `index.html` – markup
 - `src/main.js` – app-logikk (moduser, fremgang, innstillinger)
-- `src/data.js` – ordlister, klistremerker, setningsgenerator og regneoppgaver
+- `src/data.js` – ordlister, klistremerker, setningsgenerator, regneoppgaver og engelske ord
 - `src/effects.js` – lyd, konfetti, skjermlås
 - `src/storage.js` – localStorage-hjelpere
 - `src/style.css` – stiler
